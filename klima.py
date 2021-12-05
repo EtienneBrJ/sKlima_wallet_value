@@ -1,23 +1,25 @@
-from currency_converter import CurrencyConverter
 from web3 import Web3
 from sys import argv
+from datetime import datetime
+from pymongo import MongoClient
 import requests
-import decimal
 import config
 import json
 
-
-c = CurrencyConverter()
+client = MongoClient(
+    'mongodb+srv://titi:kaq9f92QNKfMUsx@cluster0.xfvlr.mongodb.net/KlimaDAO?retryWrites=true&w=majority')
+db = client.KlimaDAO
 http_provider = Web3.HTTPProvider(config.ALCHEMY_POLYGON_MAINNET)
 w3 = Web3(http_provider)
 
 
-def getsKlimaBalance(address):
+def getsKlimaBalance():
     """ Get the config.ADRRESS sKlima Balance """
     sKlima = declareToken()
-    sKlima_balance_wei = sKlima.functions.balanceOf(address).call()
+    sKlima_balance_wei = sKlima.functions.balanceOf(
+        config.WALLET_PUBLIC_ADDRESS).call()
     sKlima_balance = w3.fromWei(sKlima_balance_wei, 'gwei')
-    return sKlima_balance
+    return float(sKlima_balance)
 
 
 def declareToken():
@@ -33,29 +35,31 @@ def getKlimaPrice():
     req = requests.get(URL).text
     price = json.loads(req)
     klima_price = price[0]['Token_1_price']
-    return decimal.Decimal(float(klima_price))
+    return float(klima_price)
 
 
-def main(address):
+def main():
     """ Get the config.ADRRESS sKlima Balance
             declareToken
         Get the current Klima price
 
         Return the value of the sKlima balance in USD
     """
-    balance_sKlima = getsKlimaBalance(address)
+    balance_sKlima = getsKlimaBalance()
     klimaPrice = getKlimaPrice()
 
-    klima_usd = '{} USD'.format(int(balance_sKlima * klimaPrice))
-    klima_eur = '{} EUR'.format(
-        int(c.convert((balance_sKlima * klimaPrice), 'USD', 'EUR')))
+    klima_usd = int(balance_sKlima * klimaPrice)
+    date_now = datetime.now().replace(microsecond=0)
 
-    print(klima_usd)
-    print(klima_eur)
+    return (balance_sKlima, klima_usd, date_now)
 
 
 if __name__ == "__main__":
-    if w3.isAddress(argv[1]):
-        price = main(argv[1])
-    else:
-        print('Not a correct polygon address')
+    balance, usd_value, date = main()
+    sKlimaValue = {
+        'balance_sKlima': balance,
+        'usd_value': usd_value,
+        'date': date
+    }
+    inserted_value = db.sKlimaWallet.insert_one(sKlimaValue)
+    print('Created {}'.format(inserted_value.inserted_id))
