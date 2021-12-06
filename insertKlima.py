@@ -1,3 +1,15 @@
+"""
+    sKlima Wallet Value - The stacked token of KlimaDAO
+
+    Script that track the current value of config.WALLET_PUBLIC_ADDRESS
+    Priced on SushiSwap USDC/Klima pair
+
+    Insert into MongoDB collection:
+        - balance ok sKlima,
+        - Usd value,
+        - Date of the insertion 
+"""
+from dotenv import load_dotenv
 from web3 import Web3
 from sys import argv
 from datetime import datetime
@@ -5,16 +17,18 @@ from pymongo import MongoClient
 import requests
 import config
 import json
+import os
 
+load_dotenv()
 client = MongoClient(
-    'mongodb+srv://titi:kaq9f92QNKfMUsx@cluster0.xfvlr.mongodb.net/KlimaDAO?retryWrites=true&w=majority')
+    'mongodb+srv://titi:' + os.environ.get('password') + '@cluster0.xfvlr.mongodb.net/KlimaDAO?retryWrites=true&w=majority')
 db = client.KlimaDAO
 http_provider = Web3.HTTPProvider(config.ALCHEMY_POLYGON_MAINNET)
 w3 = Web3(http_provider)
 
 
 def getsKlimaBalance():
-    """ Get the config.ADRRESS sKlima Balance """
+    """ Get the sKlima balance of the address specified in config.py """
     sKlima = declareToken()
     sKlima_balance_wei = sKlima.functions.balanceOf(
         config.WALLET_PUBLIC_ADDRESS).call()
@@ -39,23 +53,22 @@ def getKlimaPrice():
 
 
 def main():
-    """ Get the config.ADRRESS sKlima Balance
-            declareToken
-        Get the current Klima price
+    """ Get the sKlima balance of the address specified in config.py
+        Get the current usd price of Klima
 
-        Return the value of the sKlima balance in USD
+        Return a tupple with balance (float), usd_value (int), date (date)
     """
     balance_sKlima = getsKlimaBalance()
     klimaPrice = getKlimaPrice()
 
     klima_usd = int(balance_sKlima * klimaPrice)
-    date_now = datetime.now().replace(microsecond=0)
-
+    date_now = datetime.now()
     return (balance_sKlima, klima_usd, date_now)
 
 
 if __name__ == "__main__":
     balance, usd_value, date = main()
+
     sKlimaValue = {
         'balance_sKlima': balance,
         'usd_value': usd_value,
